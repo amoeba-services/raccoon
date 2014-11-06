@@ -1,0 +1,27 @@
+{
+  "name": "raccoon",
+  "version": "0.0.0",
+  "dependencies": {
+    "lodash": "~2.4.1",
+    "react": "~0.12.0",
+    "octicons": "~2.1.2"
+  },
+  "devDependencies": {},
+  "exportsOverride": {
+    "lodash": {
+      "js": "dist/lodash.js"
+    },
+    "react": {
+      "js": [
+        "react.js",
+        "JSXTransformer.js"
+      ]
+    },
+    "octicons": {
+      "font": [
+        "octicons/octicons.css",
+        "octicons/octicons.woff"
+      ]
+    }
+  }
+}
