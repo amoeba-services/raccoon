@@ -34,6 +34,13 @@ module.exports = function (grunt) {
           livereload: true
         }
       },
+      jsx: {
+        files: ['<%= config.app %>/scripts/{,*/}*.jsx'],
+        tasks: ['jshint', 'react'],
+        options: {
+          livereload: true
+        }
+      },
       gruntfile: {
         files: ['Gruntfile.js']
       },
@@ -46,32 +53,15 @@ module.exports = function (grunt) {
       },
       livereload: {
         options: {
-          livereload: '<%= connect.options.livereload %>'
+          livereload: 35729
         },
         files: [
           '<%= config.app %>/*.html',
           '<%= config.app %>/images/{,*/}*.{png,jpg,jpeg,gif,webp,svg}',
           '<%= config.app %>/manifest.json',
           '<%= config.app %>/_locales/{,*/}*.json'
-        ]
-      }
-    },
-
-    // Grunt server and debug server setting
-    connect: {
-      options: {
-        port: 9000,
-        livereload: 35729,
-        // change this to '0.0.0.0' to access the server from outside
-        hostname: 'localhost'
-      },
-      chrome: {
-        options: {
-          open: false,
-          base: [
-            '<%= config.app %>'
-          ]
-        }
+        ],
+        tasks: []
       }
     },
 
@@ -136,6 +126,16 @@ module.exports = function (grunt) {
       }
     },
 
+    react: {
+      files: {
+        expand: true,
+        cwd: '<%= config.app %>/',
+        src: ['**/*.jsx'],
+        dest: '<%= config.app %>/',
+        ext: '.js'
+      }
+    },
+
     preprocess : {
       options: {
         inline: true,
@@ -143,7 +143,7 @@ module.exports = function (grunt) {
           DEBUG: false
         }
       },
-      html : {
+      product : {
         src : [
           '<%= config.dist %>/**/*.html'
         ]
@@ -186,16 +186,17 @@ module.exports = function (grunt) {
     grunt.task.run([
       'bower:install',
       'jshint',
-      'connect:chrome',
+      'react',
       'watch'
     ]);
   });
 
   grunt.registerTask('build', [
     'clean:dist',
+    'copy:dist',
     'chromeManifest:dist',
-    'copy',
-    'preprocess:html',
+    'react',
+    'preprocess:product',
     'compress'
   ]);
 

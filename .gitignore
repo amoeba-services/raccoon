@@ -4,6 +4,7 @@ temp
 dist
 .sass-cache
 app/bower_components
-test/bower_components
 package
 .idea
+app/libs
+app/scripts/devtools-panel.js

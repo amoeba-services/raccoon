@@ -1,7 +1,7 @@
 'use strict';
 
 var backgroundPageConnection = chrome.runtime.connect({
-  name: 'panel'
+  name: 'devtools-page'
 });
 
 backgroundPageConnection.postMessage({
@@ -13,9 +13,5 @@ chrome.devtools.panels.create(
   'Raccoon',
   null,
   'devtools-panel.html',
-  function () {
-    backgroundPageConnection.postMessage({
-      name: 'raccoon panel ready'
-    });
-  }
+  null
 );

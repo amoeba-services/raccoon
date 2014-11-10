@@ -13,8 +13,7 @@
     },
     "react": {
       "js": [
-        "react.js",
-        "JSXTransformer.js"
+        "react.js"
       ]
     },
     "octicons": {

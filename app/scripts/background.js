@@ -5,8 +5,6 @@
 //});
 //
 
-var connections = {};
-
 function beforeRequestHandler(details) {
   return {
     redirectUrl: 'http://amoeba-api.herokuapp.com/data/pc/' + encodeURIComponent(details.url)
@@ -60,61 +58,91 @@ function generateEventsHandlers() {
   };
 }
 
+var pageConnections = {},
+  panelConnections = {};
+
 chrome.runtime.onConnect.addListener(function (port) {
 
-  var extensionListener = function (message) {
+  console.log('connection established:', port);
 
-    console.log(message);
+  if (port.name === 'devtools-page') {
 
-    // The original connection event doesn't include the tab ID of the
-    // DevTools page, so we need to send it explicitly.
-    if (message.name === 'devtools page ready' && typeof message.tabId === 'number') {
-      var connection = {
-        port: port,
-        handlers: generateEventsHandlers()
-      };
-      connections[message.tabId] = connection;
+    var pageMessageListener = function (message) {
 
-      chrome.webRequest.onBeforeRequest.addListener(connection.handlers.beforeRequestHandler, {
-        'urls': ['<all_urls>'],
-        'tabId': message.tabId,
-        'types': ['xmlhttprequest']
-      }, ['blocking']);
+      console.log(message);
 
-      chrome.webRequest.onBeforeSendHeaders.addListener(connection.handlers.beforeSendHeadersHandler, {
-        'urls': ['*://amoeba-api.herokuapp.com/data/*'],
-        'tabId': message.tabId,
-        'types': ['other']
-      }, ['blocking', 'requestHeaders']);
+      // The original connection event doesn't include the tab ID of the
+      // DevTools page, so we need to send it explicitly.
+      if (message.name === 'devtools page ready' && typeof message.tabId === 'number') {
+        var connection = {
+          port: port,
+          handlers: generateEventsHandlers()
+        };
+        pageConnections[message.tabId] = connection;
 
-      chrome.webRequest.onHeadersReceived.addListener(connection.handlers.headersReceivedHandler, {
-        'urls': ['<all_urls>'],
-        'tabId': message.tabId,
-        'types': ['other']
-      }, ['blocking', 'responseHeaders']);
+        chrome.webRequest.onBeforeRequest.addListener(connection.handlers.beforeRequestHandler, {
+          'urls': ['<all_urls>'],
+          'tabId': message.tabId,
+          'types': ['xmlhttprequest']
+        }, ['blocking']);
 
-    }
+        chrome.webRequest.onBeforeSendHeaders.addListener(connection.handlers.beforeSendHeadersHandler, {
+          'urls': ['*://amoeba-api.herokuapp.com/data/*'],
+          'tabId': message.tabId,
+          'types': ['other']
+        }, ['blocking', 'requestHeaders']);
 
-  };
+        chrome.webRequest.onHeadersReceived.addListener(connection.handlers.headersReceivedHandler, {
+          'urls': ['<all_urls>'],
+          'tabId': message.tabId,
+          'types': ['other']
+        }, ['blocking', 'responseHeaders']);
 
-  // Listen to messages sent from the DevTools page
-  port.onMessage.addListener(extensionListener);
-
-  port.onDisconnect.addListener(function(port) {
-    port.onMessage.removeListener(extensionListener);
-
-    var tabs = Object.keys(connections);
-    for (var i=0, len=tabs.length; i < len; i++) {
-      var connection = connections[tabs[i]];
-      if (connection.port === port) {
-        chrome.webRequest.onBeforeRequest.removeListener(connection.handlers.beforeRequestHandler);
-        chrome.webRequest.onBeforeSendHeaders.removeListener(connection.handlers.beforeSendHeadersHandler);
-        chrome.webRequest.onHeadersReceived.removeListener(connection.handlers.headersReceivedHandler);
-        delete connections[tabs[i]];
-        break;
       }
-    }
-  });
+
+    };
+
+    // Listen to messages sent from the DevTools page
+    port.onMessage.addListener(pageMessageListener);
+
+    port.onDisconnect.addListener(function (port) {
+      port.onMessage.removeListener(pageMessageListener);
+
+      var tabs = Object.keys(pageConnections);
+      for (var i = 0, len = tabs.length; i < len; i++) {
+        var connection = pageConnections[tabs[i]];
+        if (connection.port === port) {
+          chrome.webRequest.onBeforeRequest.removeListener(connection.handlers.beforeRequestHandler);
+          chrome.webRequest.onBeforeSendHeaders.removeListener(connection.handlers.beforeSendHeadersHandler);
+          chrome.webRequest.onHeadersReceived.removeListener(connection.handlers.headersReceivedHandler);
+          delete pageConnections[tabs[i]];
+          break;
+        }
+      }
+    });
+
+    return;
+  }
+
+  if (port.name === 'devtools-panel') {
+
+    var panelMessageListener = function(message){
+
+      console.log(message);
+
+      if (message.name === 'devtools panel ready' && typeof message.tabId === 'number') {
+        var connection = {
+          port: port
+        };
+        panelConnections[message.tabId] = connection;
+      }
+    };
+
+    port.onMessage.addListener(panelMessageListener);
+
+    return;
+  }
+
 });
 
 //// Receive message from content script and relay to the devTools page for the
@@ -123,8 +151,8 @@ chrome.runtime.onConnect.addListener(function (port) {
 //  // Messages from content scripts should have sender.tab set
 //  if (sender.tab) {
 //    var tabId = sender.tab.id;
-//    if (tabId in connections) {
-//      connections[tabId].postMessage(request);
+//    if (tabId in pageConnections) {
+//      pageConnections[tabId].postMessage(request);
 //    } else {
 //      console.log('Tab not found in connection list.');
 //    }
