@@ -1,3 +1,9 @@
+/*jshint quotmark:false */
+/*jshint white:false */
+/*jshint trailing:false */
+/*jshint newcap:false */
+/*global React, Utils, _ */
+
 'use strict';
 
 var backgroundPageConnection = chrome.runtime.connect({
@@ -9,74 +15,89 @@ backgroundPageConnection.onMessage.addListener(function(message){
 });
 
 backgroundPageConnection.postMessage({
-  name: 'raccoon panel ready',
+  name: 'devtools panel ready',
   tabId: chrome.devtools.inspectedWindow.tabId
 });
 
-chrome.devtools.network.onRequestFinished.addListener(function(request){
-  //if (request.request.url.indexOf('http://amoeba-api.herokuapp.com') === 0) {
-  console.log(request);
-  //}
-});
 
-
-/*jshint ignore:start */
-var data = [
-  {author: 'Pete Hunt', text: 'This is one comment.'},
-  {author: 'Jordan Walke', text: 'This is *another* comment'}
-];
-var Comment = React.createClass({
+var RequestInfo = React.createClass({
   render: function() {
+    var info = this.props.data,
+      uri = Utils.parseUri(info.request.url);
     return (
-      <div className="comment">
-        <h2 className="commentAuthor">
-          {this.props.author}
-        </h2>
-        {this.props.children}
-      </div>
+      <tr className="request-info-item">
+        <td>{uri.path}</td>
+        <td>{info.response.status + ' ' + info.response.statusText}</td>
+      </tr>
     );
   }
 });
 
-var CommentForm = React.createClass({
+var RequestList = React.createClass({
   render: function() {
-    return (
-      <div className="commentForm">
-      Hello, world! I am a CommentForm.
-      </div>
-    );
-  }
-});
-var CommentList = React.createClass({
-  render: function() {
-    var commentNodes = this.props.data.map(function (comment) {
+    var requests = this.props.data.map(function (request) {
       return (
-        <Comment author={comment.author}>
-          {comment.text}
-        </Comment>
+        <RequestInfo data={request} key={request.time}>
+        </RequestInfo>
       );
     });
     return (
-      <div className="commentList">
-        {commentNodes}
-      </div>
-    );
-  }
-});
-var CommentBox = React.createClass({
-  render: function() {
-    return (
-      <div className="commentBox">
-        <h1>Comments</h1>
-        <CommentList data={this.props.data} />
-      <CommentForm />
-      </div>
+      <tr>
+        {requests}
+      </tr>
     );
   }
 });
 
-React.render(
-<CommentBox data={data} />,
-  document.getElementById('content')
+var RequestTable = React.createClass({
+  getInitialState: function() {
+    return {requests: [
+    ]};
+  },
+  render: function() {
+    return (
+      <table>
+        <thead>
+          <tr>
+            <td>Path</td>
+            <td>Status</td>
+          </tr>
+        </thead>
+        <tbody>
+          <RequestList data={this.state.requests}/>
+        </tbody>
+      </table>
+    );
+  }
+});
+
+var reqTable = React.render(
+  <RequestTable />,
+  document.getElementById('request-table')
 );
-/*jshint ignore:end */
+
+var requests = [];
+
+chrome.devtools.network.onRequestFinished.addListener(function(request){
+  var isXHR = (_.findIndex(request.request.headers, {
+    'name': 'X-Amoeba'
+  }) !== -1),
+    isRedirectedByExt = (
+      request.response.statusText === "Internal Redirect" &&
+      request.response.redirectURL.slice(0, 5) !== 'data:'
+    );
+  if (isXHR || isRedirectedByExt) {
+    console.log(request);
+    requests.push(request);
+    reqTable.setState({
+      requests: requests
+    });
+  }
+});
+
+chrome.devtools.network.onNavigated.addListener(function(){
+  requests = [];
+  reqTable.setState({
+    requests: requests
+  });
+});

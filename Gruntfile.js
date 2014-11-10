@@ -36,10 +36,7 @@ module.exports = function (grunt) {
       },
       jsx: {
         files: ['<%= config.app %>/scripts/{,*/}*.jsx'],
-        tasks: ['jshint', 'react'],
-        options: {
-          livereload: true
-        }
+        tasks: ['react']
       },
       gruntfile: {
         files: ['Gruntfile.js']
@@ -185,8 +182,8 @@ module.exports = function (grunt) {
   grunt.registerTask('debug', function () {
     grunt.task.run([
       'bower:install',
-      'jshint',
       'react',
+      'jshint',
       'watch'
     ]);
   });

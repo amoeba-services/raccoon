@@ -11,9 +11,21 @@ function beforeRequestHandler(details) {
   };
 }
 
+// panel.js 中通过 chrome.devtools.network.onRequestFinished 中拿到的 request 信息不包含 request type
+// 故这里给所有请求加上标记
 function beforeSendHeadersHandler(details) {
   var headers = details.requestHeaders;
-  details.requestHeaders.push({
+  headers.push({
+    name: 'X-Amoeba',
+    value: '1'
+  });
+  return {
+    requestHeaders: headers
+  };
+}
+function amoebaReqBeforeSendHeadersHandler(details) {
+  var headers = details.requestHeaders;
+  headers.push({
     name: 'X-Redirect-On-Error',
     value: '1'
   });
@@ -52,6 +64,9 @@ function generateEventsHandlers() {
     beforeSendHeadersHandler: function(details) {
       return beforeSendHeadersHandler(details);
     },
+    amoebaReqBeforeSendHeadersHandler: function(details) {
+      return amoebaReqBeforeSendHeadersHandler(details);
+    },
     headersReceivedHandler: function(details) {
       return headersReceivedHandler(details);
     }
@@ -71,6 +86,7 @@ chrome.runtime.onConnect.addListener(function (port) {
 
       console.log(message);
 
+      // devtools page 被激活
       // The original connection event doesn't include the tab ID of the
       // DevTools page, so we need to send it explicitly.
       if (message.name === 'devtools page ready' && typeof message.tabId === 'number') {
@@ -86,12 +102,21 @@ chrome.runtime.onConnect.addListener(function (port) {
           'types': ['xmlhttprequest']
         }, ['blocking']);
 
-        chrome.webRequest.onBeforeSendHeaders.addListener(connection.handlers.beforeSendHeadersHandler, {
+        // 添加 header，让 data api 出错时直接跳转到原地址
+        chrome.webRequest.onBeforeSendHeaders.addListener(connection.handlers.amoebaReqBeforeSendHeadersHandler, {
           'urls': ['*://amoeba-api.herokuapp.com/data/*'],
           'tabId': message.tabId,
           'types': ['other']
         }, ['blocking', 'requestHeaders']);
 
+        // 给所有 xhr 请求加上标记
+        chrome.webRequest.onBeforeSendHeaders.addListener(connection.handlers.beforeSendHeadersHandler, {
+          'urls': ['<all_urls>'],
+          'tabId': message.tabId,
+          'types': ['xmlhttprequest', 'other']
+        }, ['blocking', 'requestHeaders']);
+
+        // CROS headers
         chrome.webRequest.onHeadersReceived.addListener(connection.handlers.headersReceivedHandler, {
           'urls': ['<all_urls>'],
           'tabId': message.tabId,
@@ -114,6 +139,7 @@ chrome.runtime.onConnect.addListener(function (port) {
         if (connection.port === port) {
           chrome.webRequest.onBeforeRequest.removeListener(connection.handlers.beforeRequestHandler);
           chrome.webRequest.onBeforeSendHeaders.removeListener(connection.handlers.beforeSendHeadersHandler);
+          chrome.webRequest.onBeforeSendHeaders.removeListener(connection.handlers.amoebaReqBeforeSendHeadersHandler);
           chrome.webRequest.onHeadersReceived.removeListener(connection.handlers.headersReceivedHandler);
           delete pageConnections[tabs[i]];
           break;
@@ -124,6 +150,7 @@ chrome.runtime.onConnect.addListener(function (port) {
     return;
   }
 
+  // devtools panel 被激活
   if (port.name === 'devtools-panel') {
 
     var panelMessageListener = function(message){
