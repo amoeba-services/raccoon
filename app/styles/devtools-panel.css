@@ -1,0 +1,19 @@
+body {
+  font-family: 'Lucida Grande', 'Segoe UI', Tahoma, sans-serif;
+}
+
+.amoeba-status-icon {
+  color: lightgray;
+}
+
+.amoeba-status-icon[data-status="2000"] {
+  color: forestgreen;
+}
+
+.amoeba-status-icon[data-status="4003"] {
+  color: orange;
+}
+
+.amoeba-status-icon[data-status="4004"] {
+  color: lightgray;
+}

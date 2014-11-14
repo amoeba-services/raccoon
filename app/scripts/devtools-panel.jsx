@@ -30,15 +30,27 @@ backgroundPageConnection.postMessage({
   tabId: chrome.devtools.inspectedWindow.tabId
 });
 
+var AmoebaStatusIcon = React.createClass({
+  render: function(){
+    return (
+      <span className="amoeba-status-icon octicon octicon-primitive-dot" data-status={this.props.status}></span>
+    );
+  }
+});
 
 var RequestInfo = React.createClass({
   render: function() {
     var info = this.props.data,
       uri = Utils.parseUri(info.request.url);
+    info.amoeba = info.amoeba || {};
     return (
       <tr className="request-info-item">
         <td>{uri.path}</td>
         <td>{info.response.status + ' ' + info.response.statusText}</td>
+        <td>
+          <AmoebaStatusIcon status={info.amoeba.status}/>
+          {info.amoeba.status + ' ' + info.amoeba.message}
+        </td>
       </tr>
     );
   }
@@ -53,9 +65,9 @@ var RequestList = React.createClass({
       );
     });
     return (
-      <tr>
+      <tbody>
         {requests}
-      </tr>
+      </tbody>
     );
   }
 });
@@ -72,11 +84,10 @@ var RequestTable = React.createClass({
           <tr>
             <td>Path</td>
             <td>Status</td>
+            <td>AmoebaStatus</td>
           </tr>
         </thead>
-        <tbody>
-          <RequestList data={this.state.requests}/>
-        </tbody>
+        <RequestList data={this.state.requests}/>
       </table>
     );
   }
@@ -90,16 +101,53 @@ var reqTable = React.render(
 var requests = [];
 
 chrome.devtools.network.onRequestFinished.addListener(function(request){
-  var isXHR = (_.findIndex(request.request.headers, {
-    'name': 'X-Amoeba'
-  }) !== -1),
+  var isXHR = (_.findIndex(request.request.headers, { 'name': 'X-Amoeba' }) !== -1),
     isRedirectedByExt = (
       request.response.statusText === "Internal Redirect" &&
       request.response.redirectURL.slice(0, 5) !== 'data:'
     );
   if (isXHR || isRedirectedByExt) {
     console.log(request);
-    requests.push(request);
+    var url = request.request.url;
+    var originalReqIndex = _.findIndex(requests, function(req) {
+      return req.response.redirectURL === url;
+    });
+    if (originalReqIndex === -1) {
+      requests.push(request);
+    }
+    else {
+      var amoeba = {}, isAmoebaRequest = false;
+      _.forEach(request.response.headers, function(header) {
+        switch (header.name) {
+          case 'X-Amoeba-Status':
+            amoeba.status = header.value;
+            // Amoeba api 请求的 header 中一定有 X-Amoeba-Status
+            isAmoebaRequest = true;
+            break;
+          case 'X-Amoeba-Message':
+            amoeba.message = header.value;
+            break;
+          case 'X-Amoeba-Namespace':
+            amoeba.namespace = header.value;
+            break;
+          case 'X-Amoeba-Matched-Api':
+            amoeba.matchedApi = header.value;
+            break;
+        }
+      });
+      if (isAmoebaRequest) {
+        _.extend(requests[originalReqIndex], {
+          amoeba: amoeba
+        });
+        if (amoeba.status === '2000') {
+          requests[originalReqIndex].response = request.response;
+        }
+        requests[originalReqIndex].response.redirectURL = request.response.redirectURL;
+      }
+      else {
+        requests[originalReqIndex].response = request.response;
+      }
+    }
     reqTable.setState({
       requests: requests
     });
@@ -107,6 +155,7 @@ chrome.devtools.network.onRequestFinished.addListener(function(request){
 });
 
 chrome.devtools.network.onNavigated.addListener(function(){
+  console.log('page reloaded');
   requests = [];
   reqTable.setState({
     requests: requests

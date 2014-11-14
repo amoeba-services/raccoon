@@ -6,8 +6,17 @@
 //
 
 function beforeRequestHandler(details) {
+  var redirectUrl = 'http://amoeba-api.herokuapp.com/data/pc/';
+  var originalUrl = details.url;
+  var amoebaTimeStamp = Math.random().toFixed(6);
+  if (originalUrl.indexOf('?') === -1) {
+    originalUrl += '?';
+  }
+  originalUrl += '&_ATS=' + amoebaTimeStamp;
+  redirectUrl += encodeURIComponent(originalUrl);
+  redirectUrl += '?_ATS=' + amoebaTimeStamp;
   return {
-    redirectUrl: 'http://amoeba-api.herokuapp.com/data/pc/' + encodeURIComponent(details.url)
+    redirectUrl: redirectUrl
   };
 }
 
@@ -113,7 +122,12 @@ chrome.runtime.onConnect.addListener(function (port) {
         chrome.webRequest.onBeforeSendHeaders.addListener(connection.handlers.beforeSendHeadersHandler, {
           'urls': ['<all_urls>'],
           'tabId': message.tabId,
-          'types': ['xmlhttprequest', 'other']
+          'types': ['xmlhttprequest']
+        }, ['blocking', 'requestHeaders']);
+        chrome.webRequest.onBeforeSendHeaders.addListener(connection.handlers.beforeSendHeadersHandler, {
+          'urls': ['*://*/*_ATS=*'],
+          'tabId': message.tabId,
+          'types': ['other']
         }, ['blocking', 'requestHeaders']);
 
         // CROS headers
