@@ -45,11 +45,13 @@ var RequestInfo = React.createClass({
     info.amoeba = info.amoeba || {};
     return (
       <tr className="request-info-item">
+        <td>{info.request.method}</td>
         <td>{uri.path}</td>
-        <td>{info.response.status + ' ' + info.response.statusText}</td>
+        <td>
+          {info.response.status + ' ' + info.response.statusText}</td>
         <td>
           <AmoebaStatusIcon status={info.amoeba.status}/>
-          {info.amoeba.status + ' ' + info.amoeba.message}
+          {info.amoeba.status ? (info.amoeba.status + ' ' + info.amoeba.message) : '-'}
         </td>
       </tr>
     );
@@ -74,17 +76,20 @@ var RequestList = React.createClass({
 
 var RequestTable = React.createClass({
   getInitialState: function() {
-    return {requests: [
-    ]};
+    return {
+      requests: [],
+      requestDetails: undefined
+    };
   },
   render: function() {
     return (
       <table>
         <thead>
           <tr>
+            <td>Method</td>
             <td>Path</td>
-            <td>Status</td>
-            <td>AmoebaStatus</td>
+            <td>Response</td>
+            <td>Amoeba Service</td>
           </tr>
         </thead>
         <RequestList data={this.state.requests}/>
@@ -97,6 +102,76 @@ var reqTable = React.render(
   <RequestTable />,
   document.getElementById('request-table')
 );
+
+var StatusBar = React.createClass({
+  getInitialState: function() {
+    return {
+      enabled: false,
+      selectedNamespace: undefined
+    };
+  },
+  render: function() {
+    var options = this.props.namespaces.map(function(namespace) {
+      return (
+        <option value={namespace}>{namespace}</option>
+      );
+    });
+    return (
+      <div className="status-bar">
+        <label>
+          <input type="checkbox" checked={this.state.enabled} onChange={this.toggleEnable}/> Enable
+        </label>
+        <span className="octicon octicon-circle-slash" onClick={this.clearRequests}></span>
+        <label htmlFor="namespace">Namespace:</label>
+        <select value={this.state.selectedNamespace} id="namespace" onChange={this.handleNamespaceChange}>
+        {options}
+        </select>
+      </div>
+    );
+  },
+  toggleEnable: function() {
+    backgroundPageConnection.postMessage({
+      name: 'set proxy',
+      tabId: chrome.devtools.inspectedWindow.tabId,
+      data: !this.state.enabled
+    });
+    // setState is ansyc
+    this.setState({
+      enabled: !this.state.enabled
+    });
+  },
+  handleNamespaceChange: function(event) {
+    var namespace = event.target.value;
+    this.changeNamespace(namespace);
+  },
+  changeNamespace: function(namespace) {
+    backgroundPageConnection.postMessage({
+      name: 'set namespace',
+      tabId: chrome.devtools.inspectedWindow.tabId,
+      data: namespace
+    });
+    this.setState({
+      selectedNamespace: namespace
+    });
+    localStorage.setItem('selectedNamespace', namespace);
+  },
+  clearRequests: function() {
+    requests = [];
+    reqTable.setState({
+      requests: requests
+    });
+  }
+});
+
+var NAMESPACES = [
+  'playground',
+  'pc',
+  'mis'
+];
+React.render(
+  <StatusBar namespaces={NAMESPACES}/>,
+  document.getElementById('status-bar')
+).changeNamespace(localStorage.getItem('selectedNamespace') || NAMESPACES[0]);
 
 var requests = [];
 

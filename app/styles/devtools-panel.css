@@ -6,11 +6,11 @@ body {
   color: lightgray;
 }
 
-.amoeba-status-icon[data-status="2000"] {
+.amoeba-status-icon[data-status^="2"] {
   color: forestgreen;
 }
 
-.amoeba-status-icon[data-status="4003"] {
+.amoeba-status-icon[data-status^="4"] {
   color: orange;
 }
 

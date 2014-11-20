@@ -5,8 +5,15 @@
 //});
 //
 
+var panelConnections = {};
+
 function beforeRequestHandler(details) {
-  var redirectUrl = 'http://amoeba-api.herokuapp.com/data/pc/';
+  var namespace = panelConnections[details.tabId].namespace;
+  if (!namespace) {
+    console.error('namspace is not set for tab ' + details.tabId);
+    return;
+  }
+  var redirectUrl = 'http://amoeba-api.herokuapp.com/data/' + namespace + '/';
   var originalUrl = details.url;
   var amoebaTimeStamp = Math.random().toFixed(6);
   if (originalUrl.indexOf('?') === -1) {
@@ -82,41 +89,51 @@ function generateEventsHandlers() {
   };
 }
 
-var pageConnections = {},
-  panelConnections = {};
-
 chrome.runtime.onConnect.addListener(function (port) {
 
   console.log('connection established:', port);
 
-  if (port.name === 'devtools-page') {
+  //if (port.name === 'devtools-page') {
+  //
+  //  var pageMessageListener = function (message) {
+  //
+  //    console.log(message);
+  //
+  //    // devtools page 被激活
+  //    // The original connection event doesn't include the tab ID of the
+  //    // DevTools page, so we need to send it explicitly.
+  //    if (message.name === 'devtools page ready' && typeof message.tabId === 'number') {
+  //    }
+  //
+  //  };
+  //
+  //  // Listen to messages sent from the DevTools page
+  //  port.onMessage.addListener(pageMessageListener);
+  //
+  //
+  //
+  //  return;
+  //}
 
-    var pageMessageListener = function (message) {
+  // devtools panel 被激活
+  if (port.name === 'devtools-panel') {
+
+    var panelMessageListener = function(message){
 
       console.log(message);
 
-      // devtools page 被激活
-      // The original connection event doesn't include the tab ID of the
-      // DevTools page, so we need to send it explicitly.
-      if (message.name === 'devtools page ready' && typeof message.tabId === 'number') {
-        var connection = {
+      if (typeof message.tabId !== 'number') {
+        return;
+      }
+
+      var connection;
+
+      if (message.name === 'devtools panel ready') {
+        connection = {
           port: port,
           handlers: generateEventsHandlers()
         };
-        pageConnections[message.tabId] = connection;
-
-        chrome.webRequest.onBeforeRequest.addListener(connection.handlers.beforeRequestHandler, {
-          'urls': ['<all_urls>'],
-          'tabId': message.tabId,
-          'types': ['xmlhttprequest']
-        }, ['blocking']);
-
-        // 添加 header，让 data api 出错时直接跳转到原地址
-        chrome.webRequest.onBeforeSendHeaders.addListener(connection.handlers.amoebaReqBeforeSendHeadersHandler, {
-          'urls': ['*://amoeba-api.herokuapp.com/data/*'],
-          'tabId': message.tabId,
-          'types': ['other']
-        }, ['blocking', 'requestHeaders']);
+        panelConnections[message.tabId] = connection;
 
         // 给所有 xhr 请求加上标记
         chrome.webRequest.onBeforeSendHeaders.addListener(connection.handlers.beforeSendHeadersHandler, {
@@ -130,56 +147,65 @@ chrome.runtime.onConnect.addListener(function (port) {
           'types': ['other']
         }, ['blocking', 'requestHeaders']);
 
-        // CROS headers
-        chrome.webRequest.onHeadersReceived.addListener(connection.handlers.headersReceivedHandler, {
-          'urls': ['<all_urls>'],
-          'tabId': message.tabId,
-          'types': ['other']
-        }, ['blocking', 'responseHeaders']);
+        return;
+      }
 
+      connection = panelConnections[message.tabId];
+
+      if (message.name === 'set proxy') {
+        if (!message.data) {
+          chrome.webRequest.onBeforeRequest.removeListener(connection.handlers.beforeRequestHandler);
+          chrome.webRequest.onBeforeSendHeaders.removeListener(connection.handlers.amoebaReqBeforeSendHeadersHandler);
+          chrome.webRequest.onHeadersReceived.removeListener(connection.handlers.headersReceivedHandler);
+        }
+        else {
+          chrome.webRequest.onBeforeRequest.addListener(connection.handlers.beforeRequestHandler, {
+            'urls': ['<all_urls>'],
+            'tabId': message.tabId,
+            'types': ['xmlhttprequest']
+          }, ['blocking']);
+
+          // 添加 header，让 data api 出错时直接跳转到原地址
+          chrome.webRequest.onBeforeSendHeaders.addListener(connection.handlers.amoebaReqBeforeSendHeadersHandler, {
+            'urls': ['*://amoeba-api.herokuapp.com/data/*'],
+            'tabId': message.tabId,
+            'types': ['other']
+          }, ['blocking', 'requestHeaders']);
+
+          // add CROS headers
+          chrome.webRequest.onHeadersReceived.addListener(connection.handlers.headersReceivedHandler, {
+            'urls': ['<all_urls>'],
+            'tabId': message.tabId,
+            'types': ['other']
+          }, ['blocking', 'responseHeaders']);
+        }
+        return;
+      }
+
+      if (message.name === 'set namespace' && typeof message.data === 'string') {
+        panelConnections[message.tabId].namespace = message.data;
       }
 
     };
 
-    // Listen to messages sent from the DevTools page
-    port.onMessage.addListener(pageMessageListener);
+    port.onMessage.addListener(panelMessageListener);
 
     port.onDisconnect.addListener(function (port) {
-      port.onMessage.removeListener(pageMessageListener);
+      port.onMessage.removeListener(panelMessageListener);
 
-      var tabs = Object.keys(pageConnections);
+      var tabs = Object.keys(panelConnections);
       for (var i = 0, len = tabs.length; i < len; i++) {
-        var connection = pageConnections[tabs[i]];
+        var connection = panelConnections[tabs[i]];
         if (connection.port === port) {
           chrome.webRequest.onBeforeRequest.removeListener(connection.handlers.beforeRequestHandler);
           chrome.webRequest.onBeforeSendHeaders.removeListener(connection.handlers.beforeSendHeadersHandler);
           chrome.webRequest.onBeforeSendHeaders.removeListener(connection.handlers.amoebaReqBeforeSendHeadersHandler);
           chrome.webRequest.onHeadersReceived.removeListener(connection.handlers.headersReceivedHandler);
-          delete pageConnections[tabs[i]];
+          delete panelConnections[tabs[i]];
           break;
         }
       }
     });
-
-    return;
-  }
-
-  // devtools panel 被激活
-  if (port.name === 'devtools-panel') {
-
-    var panelMessageListener = function(message){
-
-      console.log(message);
-
-      if (message.name === 'devtools panel ready' && typeof message.tabId === 'number') {
-        var connection = {
-          port: port
-        };
-        panelConnections[message.tabId] = connection;
-      }
-    };
-
-    port.onMessage.addListener(panelMessageListener);
 
     return;
   }
