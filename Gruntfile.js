@@ -61,8 +61,6 @@ module.exports = function (grunt) {
 
     // Empties folders to start fresh
     clean: {
-      chrome: {
-      },
       dist: {
         files: [{
           dot: true,
