@@ -2,9 +2,12 @@
 /*jshint white:false */
 /*jshint trailing:false */
 /*jshint newcap:false */
-/*global React, Utils, _ */
+/*global Utils */
 
 'use strict';
+
+var _ = require('lodash'),
+  React = require('React');
 
 /* jshint ignore:start */
 (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
@@ -30,6 +33,37 @@ backgroundPageConnection.postMessage({
   tabId: chrome.devtools.inspectedWindow.tabId
 });
 
+var requests = [];
+
+var RequestDetails = React.createClass({
+  getInitialState: function() {
+    return {
+      request: undefined
+    };
+  },
+  render: function() {
+    if (this.state.request) {
+      return (
+        <div className="request-details">
+        {this.state.request.time}
+        </div>
+      );
+    }
+    else {
+      return (<div></div>);
+    }
+  }
+});
+
+var reqDetails = React.render(
+  <RequestDetails />,
+  document.getElementById('request-details')
+);
+
+reqDetails.setState({
+  request: {}
+});
+
 var AmoebaStatusIcon = React.createClass({
   render: function(){
     return (
@@ -46,7 +80,7 @@ var RequestInfo = React.createClass({
     return (
       <tr className="request-info-item">
         <td>{info.request.method}</td>
-        <td>{uri.path}</td>
+        <td onClick={this.showDetails}>{uri.path}</td>
         <td>
           {info.response.status + ' ' + info.response.statusText}</td>
         <td>
@@ -55,6 +89,11 @@ var RequestInfo = React.createClass({
         </td>
       </tr>
     );
+  },
+  showDetails: function() {
+    reqDetails.setState({
+      request: this.props.data
+    });
   }
 });
 
@@ -100,7 +139,7 @@ var RequestTable = React.createClass({
 
 var reqTable = React.render(
   <RequestTable />,
-  document.getElementById('request-table')
+  document.getElementById('requests-table')
 );
 
 var StatusBar = React.createClass({
@@ -173,8 +212,6 @@ React.render(
   document.getElementById('status-bar')
 ).changeNamespace(localStorage.getItem('selectedNamespace') || NAMESPACES[0]);
 
-var requests = [];
-
 chrome.devtools.network.onRequestFinished.addListener(function(request){
   var isXHR = (_.findIndex(request.request.headers, { 'name': 'X-Amoeba' }) !== -1),
     isRedirectedByExt = (
@@ -182,7 +219,7 @@ chrome.devtools.network.onRequestFinished.addListener(function(request){
       request.response.redirectURL.slice(0, 5) !== 'data:'
     );
   if (isXHR || isRedirectedByExt) {
-    console.log(request);
+    //console.log(request);
     var url = request.request.url;
     var originalReqIndex = _.findIndex(requests, function(req) {
       return req.response.redirectURL === url;
