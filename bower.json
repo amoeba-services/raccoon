@@ -6,18 +6,9 @@
     "react": "~0.12.0",
     "octicons": "~2.1.2"
   },
-  "devDependencies": {},
   "exportsOverride": {
-    "lodash": {
-      "js": "dist/lodash.js"
-    },
-    "react": {
-      "js": [
-        "react.js"
-      ]
-    },
     "octicons": {
-      "font": [
+      "octicons": [
         "octicons/octicons.css",
         "octicons/octicons.woff"
       ]

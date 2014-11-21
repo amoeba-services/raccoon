@@ -17,6 +17,7 @@ module.exports = function (grunt) {
   // Configurable paths
   var config = {
     app: 'app',
+    temp: 'temp',
     dist: 'dist'
   };
 
@@ -28,15 +29,11 @@ module.exports = function (grunt) {
     // Watches files for changes and runs tasks based on the changed files
     watch: {
       js: {
-        files: ['<%= config.app %>/scripts/{,*/}*.js'],
-        tasks: ['jshint'],
+        files: ['<%= config.app %>/scripts/{,*/}*.*'],
+        tasks: ['build'],
         options: {
           livereload: true
         }
-      },
-      jsx: {
-        files: ['<%= config.app %>/scripts/{,*/}*.jsx'],
-        tasks: ['react']
       },
       gruntfile: {
         files: ['Gruntfile.js']
@@ -100,7 +97,8 @@ module.exports = function (grunt) {
           dest: '<%= config.dist %>',
           src: [
             '**',
-            '!bower_components/**'
+            '!bower_components/**',
+            '!**/*.jsx'
           ]
         }]
       }
@@ -128,8 +126,15 @@ module.exports = function (grunt) {
         expand: true,
         cwd: '<%= config.app %>/',
         src: ['**/*.jsx'],
-        dest: '<%= config.app %>/',
+        dest: '<%= config.temp %>/',
         ext: '.js'
+      }
+    },
+
+    browserify: {
+      'devtools-panel': {
+        src: '<%= config.temp %>/scripts/devtools-panel.js',
+        dest: '<%= config.dist %>/scripts/devtools-panel.js'
       }
     },
 
@@ -168,7 +173,7 @@ module.exports = function (grunt) {
     bower: {
       install: {
         options: {
-          targetDir: '<%= config.app %>/libs',
+          targetDir: '<%= config.app %>/vendor',
           layout: 'byComponent',
           install: true,
           cleanTargetDir: true,
@@ -182,7 +187,7 @@ module.exports = function (grunt) {
   grunt.registerTask('debug', function () {
     grunt.task.run([
       'bower:install',
-      'react',
+      'build',
       'jshint',
       'watch'
     ]);
@@ -191,8 +196,16 @@ module.exports = function (grunt) {
   grunt.registerTask('build', [
     'clean:dist',
     'copy:dist',
+    'react',
+    'browserify'
+  ]);
+
+  grunt.registerTask('release', [
+    'clean:dist',
+    'copy:dist',
     'chromeManifest:dist',
     'react',
+    'browserify',
     'preprocess:product',
     'compress'
   ]);
@@ -200,6 +213,6 @@ module.exports = function (grunt) {
   grunt.registerTask('default', [
     'bower:install',
     'jshint',
-    'build'
+    'release'
   ]);
 };

@@ -6,5 +6,5 @@ dist
 app/bower_components
 package
 .idea
-app/libs
+app/vendor
 app/scripts/devtools-panel.js
