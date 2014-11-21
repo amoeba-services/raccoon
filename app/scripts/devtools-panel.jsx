@@ -1,9 +1,3 @@
-/*jshint quotmark:false */
-/*jshint white:false */
-/*jshint trailing:false */
-/*jshint newcap:false */
-/*global Utils */
-
 'use strict';
 
 var _ = require('lodash'),
@@ -215,7 +209,7 @@ React.render(
 chrome.devtools.network.onRequestFinished.addListener(function(request){
   var isXHR = (_.findIndex(request.request.headers, { 'name': 'X-Amoeba' }) !== -1),
     isRedirectedByExt = (
-      request.response.statusText === "Internal Redirect" &&
+      request.response.statusText === 'Internal Redirect' &&
       request.response.redirectURL.slice(0, 5) !== 'data:'
     );
   if (isXHR || isRedirectedByExt) {

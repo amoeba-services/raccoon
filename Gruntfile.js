@@ -81,7 +81,7 @@ module.exports = function (grunt) {
       all: [
         'Gruntfile.js',
         '<%= config.app %>/scripts/{,*/}*.js',
-        '!<%= config.app %>/scripts/vendor/*'
+        '!<%= config.app %>/vendor/*'
       ]
     },
 
@@ -182,35 +182,30 @@ module.exports = function (grunt) {
     }
   });
 
-  grunt.registerTask('debug', function () {
-    grunt.task.run([
-      'bower:install',
-      'build',
-      'jshint',
-      'watch'
-    ]);
-  });
 
   grunt.registerTask('build', [
+    'jshint',
     'clean:dist',
     'copy:dist',
     'react',
     'browserify'
   ]);
 
+  grunt.registerTask('debug', [
+    'bower:install',
+    'build',
+    'watch'
+  ]);
+
   grunt.registerTask('release', [
-    'clean:dist',
-    'copy:dist',
+    'build',
     'chromeManifest:dist',
-    'react',
-    'browserify',
     'preprocess:product',
     'compress'
   ]);
 
   grunt.registerTask('default', [
     'bower:install',
-    'jshint',
     'release'
   ]);
 };
