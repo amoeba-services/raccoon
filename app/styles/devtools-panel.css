@@ -17,3 +17,8 @@ body {
 .amoeba-status-icon[data-status="4004"] {
   color: lightgray;
 }
+
+.source-code,
+.source-code .CodeMirror {
+  font-family: Menlo, Consolas, Lucida Console, dejavu sans mono, monospace;
+}

@@ -28,34 +28,22 @@ module.exports = function (grunt) {
 
     // Watches files for changes and runs tasks based on the changed files
     watch: {
-      js: {
-        files: ['<%= config.app %>/scripts/{,*/}*.*'],
-        tasks: ['build'],
-        options: {
-          livereload: true
-        }
-      },
       gruntfile: {
         files: ['Gruntfile.js']
-      },
-      styles: {
-        files: ['<%= config.app %>/styles/{,*/}*.css'],
-        tasks: [],
-        options: {
-          livereload: true
-        }
       },
       livereload: {
         options: {
           livereload: 35729
         },
         files: [
+          '<%= config.app %>/scripts/{,*/}*.*',
+          '<%= config.app %>/styles/{,*/}*.css',
           '<%= config.app %>/*.html',
           '<%= config.app %>/images/{,*/}*.{png,jpg,jpeg,gif,webp,svg}',
           '<%= config.app %>/manifest.json',
           '<%= config.app %>/_locales/{,*/}*.json'
         ],
-        tasks: []
+        tasks: ['build']
       }
     },
 
@@ -67,6 +55,14 @@ module.exports = function (grunt) {
           src: [
             '<%= config.dist %>/*',
             '!<%= config.dist %>/.git*'
+          ]
+        }]
+      },
+      temp: {
+        files: [{
+          dot: true,
+          src: [
+            '<%= config.temp %>/*'
           ]
         }]
       }
@@ -97,6 +93,17 @@ module.exports = function (grunt) {
             '**',
             '!bower_components/**',
             '!**/*.jsx'
+          ]
+        }]
+      },
+      release: {
+        files: [{
+          expand: true,
+          dot: true,
+          cwd: '<%= config.dist %>',
+          dest: '<%= config.temp %>',
+          src: [
+            '**'
           ]
         }]
       }
@@ -133,6 +140,17 @@ module.exports = function (grunt) {
       'devtools-panel': {
         src: '<%= config.temp %>/scripts/devtools-panel.js',
         dest: '<%= config.dist %>/scripts/devtools-panel.js'
+      }
+    },
+
+    uglify: {
+      dist: {
+        files: [{
+          expand: true,
+          cwd: '<%= config.temp %>',
+          src: '**/*.js',
+          dest: '<%= config.dist %>'
+        }]
       }
     },
 
@@ -187,6 +205,7 @@ module.exports = function (grunt) {
     'jshint',
     'clean:dist',
     'copy:dist',
+    'clean:temp',
     'react',
     'browserify'
   ]);
@@ -201,6 +220,9 @@ module.exports = function (grunt) {
     'build',
     'chromeManifest:dist',
     'preprocess:product',
+    'clean:temp',
+    'copy:release',
+    'uglify',
     'compress'
   ]);
 

@@ -2,7 +2,8 @@
   "name": "raccoon",
   "version": "0.0.0",
   "dependencies": {
-    "octicons": "~2.1.2"
+    "octicons": "~2.1.2",
+    "codemirror": "~4.8.0"
   },
   "exportsOverride": {
     "octicons": {
@@ -10,6 +11,9 @@
         "octicons/octicons.css",
         "octicons/octicons.woff"
       ]
+    },
+    "codemirror": {
+      "codemirror" :"./"
     }
   }
 }

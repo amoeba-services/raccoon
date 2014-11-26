@@ -3,8 +3,7 @@ temp
 .tmp
 dist
 .sass-cache
-app/bower_components
+bower_components
 package
 .idea
 app/vendor
-app/scripts/devtools-panel.js

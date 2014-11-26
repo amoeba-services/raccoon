@@ -1,7 +1,10 @@
 'use strict';
 
 var _ = require('lodash'),
+  jsonFormat = require('json-format'),
   React = require('React');
+
+CodeMirror.modeURL = 'vendor/codemirror/codemirror/mode/%N/%N.js'; // 好恶心
 
 /* jshint ignore:start */
 (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
@@ -29,6 +32,44 @@ backgroundPageConnection.postMessage({
 
 var requests = [];
 
+function updateCM(content) {
+  var contentType = _.find(this.props.req.response.headers, { 'name': 'Content-Type' }).value;
+  contentType = contentType.split(';')[0];
+  var modeInfo = CodeMirror.findModeByMIME(contentType),
+    mode = modeInfo.mode;
+  if (content === null) {
+    content = '';
+  }
+  if (modeInfo.name === 'JSON') {
+    try {
+      content = jsonFormat(JSON.parse(content));
+    }
+    catch (e) {
+      console.log('Invalid JSON:', content);
+    }
+  }
+
+  this._cm.setOption('mode', mode);
+  CodeMirror.autoLoadMode(this._cm, mode);
+  this._cm.setValue(content);
+}
+var CM = React.createClass({
+  render: function() {
+    return <div className="source-code"></div>
+  },
+  componentDidMount: function() {
+    this._cm = CodeMirror(this.getDOMNode(), {
+      tabSize: 2,
+      readOnly: true,
+      lineNumbers: true
+    });
+    this.props.req.getContent( _.bind(updateCM ,this));
+  },
+  shouldComponentUpdate: function(nextProps) {
+    nextProps.req.getContent(_.bind(updateCM, this));
+    return false;
+  }
+});
 var RequestDetails = React.createClass({
   getInitialState: function() {
     return {
@@ -36,16 +77,53 @@ var RequestDetails = React.createClass({
     };
   },
   render: function() {
-    if (this.state.request) {
+    var req = this.state.request;
+    if (req) {
+      var itemRenderer = function(item) {
+        return (
+          <div>{item.name}: {item.value}</div>
+        );
+      };
+      var reqParamsList = req.request.queryString.map(function(item) {
+          item.value = decodeURIComponent(item.value);
+          return item;
+        }).map(itemRenderer),
+        reqParams = reqParamsList.length ? (
+          <div>Params: {reqParamsList}</div>
+        ) : undefined,
+        reqHeadersList = req.request.headers.map(itemRenderer),
+        reqHeaders = reqHeadersList.length ? (
+          <div>Headers: {reqHeadersList}</div>
+        ) : undefined,
+        resHeadersList = req.response.headers.map(itemRenderer),
+        resHeaders = resHeadersList.length ? (
+          <div>Headers: {resHeadersList}</div>
+        ) : undefined;
+
       return (
         <div className="request-details">
-        {this.state.request.time}
+          <span className="octicon octicon-x close-btn" onClick={this.clearDetails} title="Clear"></span>
+          <h2>Request2</h2>
+          <p>URL: {req.request.url}</p>
+          <p>Method: {req.request.method}</p>
+          {reqParams}
+          {reqHeaders}
+          <h2>Response</h2>
+          <p>State: {req.response.status} {req.response.statusText}</p>
+          {resHeaders}
+          <p>Body: </p>
+          <CM req={req}/>
         </div>
       );
     }
     else {
-      return (<div></div>);
+      return <div></div>;
     }
+  },
+  clearDetails: function() {
+    this.setState({
+      request: undefined
+    });
   }
 });
 
@@ -55,7 +133,7 @@ var reqDetails = React.render(
 );
 
 reqDetails.setState({
-  request: {}
+  request: null
 });
 
 var AmoebaStatusIcon = React.createClass({
@@ -95,7 +173,7 @@ var RequestList = React.createClass({
   render: function() {
     var requests = this.props.data.map(function (request) {
       return (
-        <RequestInfo data={request} key={request.time}>
+        <RequestInfo data={request} key={request.key}>
         </RequestInfo>
       );
     });
@@ -154,11 +232,11 @@ var StatusBar = React.createClass({
         <label>
           <input type="checkbox" checked={this.state.enabled} onChange={this.toggleEnable}/> Enable
         </label>
-        <span className="octicon octicon-circle-slash" onClick={this.clearRequests}></span>
         <label htmlFor="namespace">Namespace:</label>
         <select value={this.state.selectedNamespace} id="namespace" onChange={this.handleNamespaceChange}>
         {options}
         </select>
+        <span className="octicon octicon-circle-slash" onClick={this.clearRequests} title="Clear"></span>
       </div>
     );
   },
@@ -193,6 +271,7 @@ var StatusBar = React.createClass({
     reqTable.setState({
       requests: requests
     });
+    reqDetails.clearDetails();
   }
 });
 
@@ -213,12 +292,13 @@ chrome.devtools.network.onRequestFinished.addListener(function(request){
       request.response.redirectURL.slice(0, 5) !== 'data:'
     );
   if (isXHR || isRedirectedByExt) {
-    //console.log(request);
+    console.log(request);
     var url = request.request.url;
     var originalReqIndex = _.findIndex(requests, function(req) {
       return req.response.redirectURL === url;
     });
     if (originalReqIndex === -1) {
+      request.key = request.time; // React Array key
       requests.push(request);
     }
     else {
@@ -242,16 +322,20 @@ chrome.devtools.network.onRequestFinished.addListener(function(request){
         }
       });
       if (isAmoebaRequest) {
-        _.extend(requests[originalReqIndex], {
-          amoeba: amoeba
+        _.extend(request, {
+          amoeba: amoeba,
+          key: requests[originalReqIndex].key,
+          request: requests[originalReqIndex].request
         });
-        if (amoeba.status === '2000') {
-          requests[originalReqIndex].response = request.response;
-        }
-        requests[originalReqIndex].response.redirectURL = request.response.redirectURL;
+        requests[originalReqIndex] = request;
       }
       else {
-        requests[originalReqIndex].response = request.response;
+        _.extend(request, {
+          amoeba: requests[originalReqIndex].amoeba,
+          key: requests[originalReqIndex].key,
+          request: requests[originalReqIndex].request
+        });
+        requests[originalReqIndex] = request;
       }
     }
     reqTable.setState({

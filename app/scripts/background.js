@@ -8,13 +8,17 @@
 var panelConnections = {};
 
 function beforeRequestHandler(details) {
+  var originalUrl = details.url;
+  if (originalUrl.indexOf('_ATS=') !== -1) {
+    // 如果出现 _ATS= 则不再跳转
+    return;
+  }
   var namespace = panelConnections[details.tabId].namespace;
   if (!namespace) {
     console.error('namspace is not set for tab ' + details.tabId);
     return;
   }
   var redirectUrl = 'http://amoeba-api.herokuapp.com/data/' + namespace + '/';
-  var originalUrl = details.url;
   var amoebaTimeStamp = Math.random().toFixed(6);
   if (originalUrl.indexOf('?') === -1) {
     originalUrl += '?';
@@ -169,14 +173,14 @@ chrome.runtime.onConnect.addListener(function (port) {
           chrome.webRequest.onBeforeSendHeaders.addListener(connection.handlers.amoebaReqBeforeSendHeadersHandler, {
             'urls': ['*://amoeba-api.herokuapp.com/data/*'],
             'tabId': message.tabId,
-            'types': ['other']
+            'types': ['xmlhttprequest', 'other']
           }, ['blocking', 'requestHeaders']);
 
           // add CROS headers
           chrome.webRequest.onHeadersReceived.addListener(connection.handlers.headersReceivedHandler, {
             'urls': ['<all_urls>'],
             'tabId': message.tabId,
-            'types': ['other']
+            'types': ['xmlhttprequest', 'other']
           }, ['blocking', 'responseHeaders']);
         }
         return;
