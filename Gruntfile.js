@@ -37,7 +37,7 @@ module.exports = function (grunt) {
         },
         files: [
           '<%= config.app %>/scripts/{,*/}*.*',
-          '<%= config.app %>/styles/{,*/}*.css',
+          '<%= config.app %>/styles/{,*/}*.*',
           '<%= config.app %>/*.html',
           '<%= config.app %>/images/{,*/}*.{png,jpg,jpeg,gif,webp,svg}',
           '<%= config.app %>/manifest.json',
@@ -92,7 +92,8 @@ module.exports = function (grunt) {
           src: [
             '**',
             '!bower_components/**',
-            '!**/*.jsx'
+            '!**/*.jsx',
+            '!**/*.less'
           ]
         }]
       },
@@ -140,6 +141,16 @@ module.exports = function (grunt) {
       'devtools-panel': {
         src: '<%= config.temp %>/scripts/devtools-panel.js',
         dest: '<%= config.dist %>/scripts/devtools-panel.js'
+      }
+    },
+
+    less: {
+      'dist': {
+        expand: true,
+        cwd: '<%= config.app %>',
+        src: '**/*.less',
+        dest: '<%= config.dist %>',
+        ext: '.css'
       }
     },
 
@@ -207,7 +218,8 @@ module.exports = function (grunt) {
     'copy:dist',
     'clean:temp',
     'react',
-    'browserify'
+    'browserify',
+    'less'
   ]);
 
   grunt.registerTask('debug', [

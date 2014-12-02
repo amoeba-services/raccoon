@@ -1,0 +1,185 @@
+.column-flex() {
+  display: flex;
+  flex-direction: column;
+}
+.text-overflow(...) {
+  overflow: hidden;
+}
+.text-overflow() {
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.text-overflow(@line-number) {
+  display: -webkit-box;
+  -webkit-line-clamp: @line-number;
+  -webkit-box-orient: vertical;
+}
+
+@majorTextColor: #222;
+@minorTextColor: gray;
+@border: 1px solid #ddd;
+
+.icon-btn {
+  color: #666;
+  &:hover {
+    color: #333;
+  }
+}
+
+html {
+  height: 100%;
+}
+body {
+  margin: 0;
+  height: 100%;
+  font: 12px/1.4 'Lucida Grande', 'Segoe UI', Tahoma, sans-serif;
+  color: @majorTextColor;
+  .column-flex();
+}
+
+#status-bar {
+}
+#requests-table {
+  flex: 1;
+  overflow: auto;
+}
+
+.status-bar {
+  border-bottom: @border;
+  line-height: 27px;
+  display: flex;
+  .operation-group {
+    display: inline-flex;
+    &:not(:last-child):after {
+      content: '|';
+      color: #E6E6E6;
+    }
+  }
+  .operation {
+    padding: 0 4px;
+    vertical-align: middle;
+    &>input,
+    &>span {
+      vertical-align: middle;
+    }
+  }
+  .operation-clear {
+    .icon-btn();
+    .icon {
+      font-size: 21px;
+      padding: 0 3px;
+    }
+  }
+  select {
+    border: 1px solid #bfbfbf;
+    color: @majorTextColor;
+  }
+}
+
+#requests-table {
+  .column-flex();
+  table {
+    .column-flex();
+    flex: 1;
+    border-collapse: collapse;
+  }
+  thead {
+    border-bottom: @border;
+  }
+  tbody {
+    flex: 1;
+    .column-flex();
+    overflow: auto;
+  }
+  tr {
+    display: block;
+    display: flex;
+    &.filler {
+      flex: 1;
+      .path {
+        cursor: default;
+      }
+    }
+  }
+  td {
+    display: inline-block;
+    padding: 2px 6px;
+    line-height: 20px;
+    &:not(:last-child) {
+      border-right: @border;
+    }
+  }
+
+  .method {
+    width: 5%;
+    .text-overflow();
+  }
+  .path {
+    width: 25%;
+    cursor: pointer;
+    .text-overflow();
+    &:hover {
+      text-decoration: underline;
+    }
+    .text-overflow();
+  }
+  .status {
+    width: 10%;
+    .text-overflow();
+  }
+  .content-type {
+    width: 10%;
+    .text-overflow();
+  }
+  .amoeba {
+    width: 20%;
+    .text-overflow();
+  }
+}
+
+.amoeba-status-icon {
+  color: lightgray;
+
+  &[data-status^="2"] {
+    color: forestgreen;
+  }
+
+  &[data-status^="4"] {
+    color: orange;
+  }
+
+  &[data-status="4004"] {
+    color: lightgray;
+  }
+}
+
+
+.request-info-item {
+  cursor: default;
+  &:nth-child(2n+1) {
+    background: #eee;
+  }
+  &.active {
+    background: hsl(203, 62%, 90%);
+  }
+}
+
+.request-details {
+  word-break: break-all;
+}
+
+.info {
+  &[data-ellipse="true"] {
+    .text-overflow(3);
+  }
+  .name {
+    font-weight: bold;
+  }
+}
+
+.source-code {
+  &,
+  .CodeMirror {
+    font-family: Menlo, Consolas, Lucida Console, dejavu sans mono, monospace;
+  }
+}

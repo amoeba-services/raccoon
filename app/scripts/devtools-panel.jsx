@@ -33,9 +33,8 @@ backgroundPageConnection.postMessage({
 var requests = [];
 
 function updateCM(content) {
-  var contentType = _.find(this.props.req.response.headers, { 'name': 'Content-Type' }).value;
-  contentType = contentType.split(';')[0];
-  var modeInfo = CodeMirror.findModeByMIME(contentType),
+  var contentType = this.props.req.response.contentType;
+  var modeInfo = CodeMirror.findModeByMIME(contentType) || {},
     mode = modeInfo.mode;
   if (content === null) {
     content = '';
@@ -70,6 +69,26 @@ var CM = React.createClass({
     return false;
   }
 });
+var InfoItem = React.createClass({
+  getInitialState: function() {
+    return {
+      ellipse: true
+    };
+  },
+  render: function() {
+    return (
+      <div className="info" data-ellipse={this.state.ellipse} onClick={this.toggleEllipse}>
+        <span className="name">{this.props.data.name}: </span>
+       {this.props.data.value}
+      </div>
+    );
+  },
+  toggleEllipse: function() {
+    this.setState({
+      ellipse: !this.state.ellipse
+    });
+  }
+});
 var RequestDetails = React.createClass({
   getInitialState: function() {
     return {
@@ -80,9 +99,7 @@ var RequestDetails = React.createClass({
     var req = this.state.request;
     if (req) {
       var itemRenderer = function(item) {
-        return (
-          <div>{item.name}: {item.value}</div>
-        );
+        return <InfoItem data={item} />;
       };
       var reqParamsList = req.request.queryString.map(function(item) {
           item.value = decodeURIComponent(item.value);
@@ -149,15 +166,21 @@ var RequestInfo = React.createClass({
     var info = this.props.data,
       uri = Utils.parseUri(info.request.url);
     info.amoeba = info.amoeba || {};
+    var statusText = info.response.status + ' ' + info.response.statusText,
+      amoebaStatusText = ' ' + (info.amoeba.status ? (info.amoeba.status + ' ' + info.amoeba.message) : '-');
     return (
       <tr className="request-info-item">
-        <td>{info.request.method}</td>
-        <td onClick={this.showDetails}>{uri.path}</td>
-        <td>
-          {info.response.status + ' ' + info.response.statusText}</td>
-        <td>
+        <td className="method" title={info.request.method}>{info.request.method}</td>
+        <td className="path" onClick={this.showDetails} title={uri.path}>{uri.path}</td>
+        <td className="status">
+          {statusText}
+        </td>
+        <td className="content-type" title={info.response.contentType}>
+          {info.response.contentType}
+        </td>
+        <td className="amoeba">
           <AmoebaStatusIcon status={info.amoeba.status}/>
-          {info.amoeba.status ? (info.amoeba.status + ' ' + info.amoeba.message) : '-'}
+          {amoebaStatusText}
         </td>
       </tr>
     );
@@ -180,6 +203,13 @@ var RequestList = React.createClass({
     return (
       <tbody>
         {requests}
+        <tr className="filler">
+          <td className="method"></td>
+          <td className="path"></td>
+          <td className="status"></td>
+          <td className="content-type"></td>
+          <td className="amoeba"></td>
+        </tr>
       </tbody>
     );
   }
@@ -197,10 +227,11 @@ var RequestTable = React.createClass({
       <table>
         <thead>
           <tr>
-            <td>Method</td>
-            <td>Path</td>
-            <td>Response</td>
-            <td>Amoeba Service</td>
+            <td className="method">Method</td>
+            <td className="path">Path</td>
+            <td className="status">Response</td>
+            <td className="content-type">Type</td>
+            <td className="amoeba">Amoeba Service</td>
           </tr>
         </thead>
         <RequestList data={this.state.requests}/>
@@ -229,14 +260,23 @@ var StatusBar = React.createClass({
     });
     return (
       <div className="status-bar">
-        <label>
-          <input type="checkbox" checked={this.state.enabled} onChange={this.toggleEnable}/> Enable
-        </label>
-        <label htmlFor="namespace">Namespace:</label>
-        <select value={this.state.selectedNamespace} id="namespace" onChange={this.handleNamespaceChange}>
-        {options}
-        </select>
-        <span className="octicon octicon-circle-slash" onClick={this.clearRequests} title="Clear"></span>
+        <div className="operation-group">
+          <label className="operation">
+            <input type="checkbox" checked={this.state.enabled} onChange={this.toggleEnable}/>Enable
+          </label>
+          <label className="operation">
+            <select title="namespace" className="" value={this.state.selectedNamespace} id="namespace" onChange={this.handleNamespaceChange}>
+              <optgroup label="Namespace">
+              {options}
+              </optgroup>
+            </select>
+          </label>
+          </div>
+        <div className="operation-group">
+          <label className="operation operation-clear" onClick={this.clearRequests} title="Clear">
+            <span className="icon octicon octicon-circle-slash"></span>
+          </label>
+        </div>
       </div>
     );
   },
@@ -294,6 +334,12 @@ chrome.devtools.network.onRequestFinished.addListener(function(request){
   if (isXHR || isRedirectedByExt) {
     console.log(request);
     var url = request.request.url;
+    var contentTypeHeader = _.find(request.response.headers, { 'name': 'Content-Type' });
+    var contentType = '';
+    if (contentTypeHeader) {
+      contentType = contentTypeHeader.value.split(';')[0];
+    }
+    request.response.contentType = contentType;
     var originalReqIndex = _.findIndex(requests, function(req) {
       return req.response.redirectURL === url;
     });
