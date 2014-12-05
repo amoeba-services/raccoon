@@ -2,7 +2,7 @@
 
 var _ = require('lodash'),
   jsonFormat = require('json-format'),
-  React = require('React');
+  React = require('react/addons');
 
 CodeMirror.modeURL = 'vendor/codemirror/codemirror/mode/%N/%N.js'; // 好恶心
 
@@ -30,7 +30,6 @@ backgroundPageConnection.postMessage({
   tabId: chrome.devtools.inspectedWindow.tabId
 });
 
-var requests = [];
 
 function updateCM(content) {
   var contentType = this.props.req.response.contentType;
@@ -60,7 +59,9 @@ var CM = React.createClass({
     this._cm = CodeMirror(this.getDOMNode(), {
       tabSize: 2,
       readOnly: true,
-      lineNumbers: true
+      lineNumbers: true,
+      foldGutter: true,
+      gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"]
     });
     this.props.req.getContent( _.bind(updateCM ,this));
   },
@@ -77,9 +78,9 @@ var InfoItem = React.createClass({
   },
   render: function() {
     return (
-      <div className="info" data-ellipse={this.state.ellipse} onClick={this.toggleEllipse}>
+      <div className="info secondary" data-ellipse={this.state.ellipse} onClick={this.toggleEllipse}>
         <span className="name">{this.props.data.name}: </span>
-       {this.props.data.value}
+        {this.props.data.value}
       </div>
     );
   },
@@ -89,46 +90,64 @@ var InfoItem = React.createClass({
     });
   }
 });
+var amoebaHeaderFilter = function(header) {
+  return !(/^X-Amoeba/.test(header.name));
+};
+var itemRenderer = function(item) {
+  return <InfoItem data={item} />;
+};
 var RequestDetails = React.createClass({
   getInitialState: function() {
     return {
-      request: undefined
+      fullScreenCode: false
     };
   },
   render: function() {
-    var req = this.state.request;
+    var req = this.props.request;
     if (req) {
-      var itemRenderer = function(item) {
-        return <InfoItem data={item} />;
-      };
+      req = req.request;
       var reqParamsList = req.request.queryString.map(function(item) {
           item.value = decodeURIComponent(item.value);
           return item;
         }).map(itemRenderer),
         reqParams = reqParamsList.length ? (
-          <div>Params: {reqParamsList}</div>
+          <div className="info"><span className="name">Params: </span>{reqParamsList}</div>
         ) : undefined,
-        reqHeadersList = req.request.headers.map(itemRenderer),
+        reqHeadersList = _(req.request.headers).filter(amoebaHeaderFilter).sortBy('name').value().map(itemRenderer),
         reqHeaders = reqHeadersList.length ? (
-          <div>Headers: {reqHeadersList}</div>
+          <div className="info"><span className="name">Headers: </span>{reqHeadersList}</div>
         ) : undefined,
-        resHeadersList = req.response.headers.map(itemRenderer),
+        resHeadersList = _(req.response.headers).filter(amoebaHeaderFilter).sortBy('name').value().map(itemRenderer),
         resHeaders = resHeadersList.length ? (
-          <div>Headers: {resHeadersList}</div>
-        ) : undefined;
+          <div className="info"><span className="name">Headers: </span>{resHeadersList}</div>
+        ) : undefined,
+        fullScreenBtn = this.state.fullScreenCode ? (
+          <span className="octicon octicon-chevron-right"></span>
+        ) : (
+          <span className="octicon octicon-chevron-left"></span>
+        );
+      var reqInfoDom = this.getDOMNode().getElementsByClassName('request-info');
+      if (reqInfoDom.length) {
+        reqInfoDom[0].scrollTop = 0;
+      }
 
       return (
-        <div className="request-details">
-          <span className="octicon octicon-x close-btn" onClick={this.clearDetails} title="Clear"></span>
-          <h2>Request2</h2>
-          <p>URL: {req.request.url}</p>
-          <p>Method: {req.request.method}</p>
-          {reqParams}
-          {reqHeaders}
-          <h2>Response</h2>
-          <p>State: {req.response.status} {req.response.statusText}</p>
-          {resHeaders}
-          <p>Body: </p>
+        <div className="request-details" data-full-screen-mode={this.state.fullScreenCode}>
+          <span className="octicon octicon-x close-btn" onClick={this.handleClose} title="Clear"></span>
+          <div className="request-info">
+            <h2>Request</h2>
+            <p className="info"><span className="name">URL: </span>{req.request.url}</p>
+            <p className="info"><span className="name">Method: </span>{req.request.method}</p>
+            {reqParams}
+            {reqHeaders}
+            <h2>Response</h2>
+            <p className="info"><span className="name">State: </span>{req.response.status} {req.response.statusText}</p>
+            {resHeaders}
+            <p className="info"><span className="name">Body: </span><span className="octicon octicon-arrow-right"></span></p>
+          </div>
+          <div className="fullscreen-btn" title="Toggle Full Screen" onClick={this.toggleFullScreen}>
+            {fullScreenBtn}
+          </div>
           <CM req={req}/>
         </div>
       );
@@ -137,20 +156,26 @@ var RequestDetails = React.createClass({
       return <div></div>;
     }
   },
-  clearDetails: function() {
+  toggleFullScreen: function() {
     this.setState({
-      request: undefined
+      fullScreenCode: !this.state.fullScreenCode
     });
+  },
+  handleClose: function() {
+    if (typeof this.props.onClose === 'function') {
+      this.props.onClose();
+    }
+  },
+  shouldComponentUpdate: function(nextProps, nextState) {
+    if (!(
+      nextProps.request
+      && this.props.request
+      && nextProps.request.key === this.props.request.key
+    )) {
+      return true;
+    }
+    return !_.isEqual(nextState, this.state);
   }
-});
-
-var reqDetails = React.render(
-  <RequestDetails />,
-  document.getElementById('request-details')
-);
-
-reqDetails.setState({
-  request: null
 });
 
 var AmoebaStatusIcon = React.createClass({
@@ -163,15 +188,16 @@ var AmoebaStatusIcon = React.createClass({
 
 var RequestInfo = React.createClass({
   render: function() {
-    var info = this.props.data,
+    //console.log('RequestInfo rendered');
+    var info = this.props.request.request,
       uri = Utils.parseUri(info.request.url);
     info.amoeba = info.amoeba || {};
     var statusText = info.response.status + ' ' + info.response.statusText,
       amoebaStatusText = ' ' + (info.amoeba.status ? (info.amoeba.status + ' ' + info.amoeba.message) : '-');
     return (
-      <tr className="request-info-item">
+      <tr className="request-info-item" data-active={this.props.request.active}>
         <td className="method" title={info.request.method}>{info.request.method}</td>
-        <td className="path" onClick={this.showDetails} title={uri.path}>{uri.path}</td>
+        <td className="path" onClick={this.active} title={uri.path}>{uri.path}</td>
         <td className="status">
           {statusText}
         </td>
@@ -185,33 +211,37 @@ var RequestInfo = React.createClass({
       </tr>
     );
   },
-  showDetails: function() {
-    reqDetails.setState({
-      request: this.props.data
-    });
+  active: function() {
+    if (typeof this.props.onActive === 'function') {
+      this.props.onActive(this.props.index);
+    }
+  },
+  shouldComponentUpdate: function(nextProps) {
+    return !(
+      nextProps.request._version === this.props.request._version
+      && nextProps.request.active === this.props.request.active
+    );
   }
 });
 
 var RequestList = React.createClass({
   render: function() {
-    var requests = this.props.data.map(function (request) {
+    var requests = this.props.data.map(function (request, index) {
       return (
-        <RequestInfo data={request} key={request.key}>
+        <RequestInfo request={request} key={request.key} index={index} onActive={this.itemActiveHandler}>
         </RequestInfo>
       );
-    });
+    }, this);
     return (
       <tbody>
         {requests}
-        <tr className="filler">
-          <td className="method"></td>
-          <td className="path"></td>
-          <td className="status"></td>
-          <td className="content-type"></td>
-          <td className="amoeba"></td>
-        </tr>
       </tbody>
     );
+  },
+  itemActiveHandler: function(index) {
+    if (typeof this.props.onItemActive === 'function') {
+      this.props.onItemActive(index);
+    }
   }
 });
 
@@ -219,24 +249,68 @@ var RequestTable = React.createClass({
   getInitialState: function() {
     return {
       requests: [],
-      requestDetails: undefined
+      selectedRequest: undefined
     };
   },
   render: function() {
     return (
-      <table>
-        <thead>
-          <tr>
-            <td className="method">Method</td>
-            <td className="path">Path</td>
-            <td className="status">Response</td>
-            <td className="content-type">Type</td>
-            <td className="amoeba">Amoeba Service</td>
-          </tr>
-        </thead>
-        <RequestList data={this.state.requests}/>
-      </table>
+      <div className="request-table-container">
+        <table className="request-table">
+          <thead>
+            <tr>
+              <td className="method" title="Method">Method</td>
+              <td className="path" title="Path">Path</td>
+              <td className="status" title="Status">Status</td>
+              <td className="content-type" title="Type">Type</td>
+              <td className="amoeba" title="Amoeba Service">Amoeba Service</td>
+            </tr>
+          </thead>
+          <RequestList data={this.state.requests} onItemActive={this.setDetails}/>
+        </table>
+        <table className="filler">
+          <tbody>
+            <tr>
+              <td className="method"></td>
+              <td className="path"></td>
+              <td className="status"></td>
+              <td className="content-type"></td>
+              <td className="amoeba"></td>
+            </tr>
+          </tbody>
+        </table>
+        <RequestDetails request={this.state.selectedRequest} onClose={this.clearDetails}/>
+      </div>
     );
+  },
+  setDetails: function(index) {
+    var selectedRequest;
+    var requests = this.state.requests;
+    var previousActiveRequestIndex = _(requests).findIndex('active');
+    var query = {};
+    if (previousActiveRequestIndex !== -1) {
+      query[previousActiveRequestIndex] = {
+        $merge: {
+          active: false
+        }
+      };
+    }
+    var request = requests[index];
+    if (requests[index] !== undefined) {
+      query[index] = {
+        $merge: {
+          active: true
+        }
+      };
+      selectedRequest = request;
+    }
+    requests = React.addons.update(requests, query);
+    this.setState({
+      selectedRequest: selectedRequest,
+      requests: requests
+    });
+  },
+  clearDetails: function() {
+    this.setDetails(-1);
   }
 });
 
@@ -307,11 +381,10 @@ var StatusBar = React.createClass({
     localStorage.setItem('selectedNamespace', namespace);
   },
   clearRequests: function() {
-    requests = [];
+    // setState 是异步的，clearDetails需要 copy state，所以必须回调f
     reqTable.setState({
-      requests: requests
-    });
-    reqDetails.clearDetails();
+      requests: []
+    }, reqTable.clearDetails);
   }
 });
 
@@ -326,13 +399,14 @@ React.render(
 ).changeNamespace(localStorage.getItem('selectedNamespace') || NAMESPACES[0]);
 
 chrome.devtools.network.onRequestFinished.addListener(function(request){
+  var requests = reqTable.state.requests;
+
   var isXHR = (_.findIndex(request.request.headers, { 'name': 'X-Amoeba' }) !== -1),
     isRedirectedByExt = (
       request.response.statusText === 'Internal Redirect' &&
       request.response.redirectURL.slice(0, 5) !== 'data:'
     );
   if (isXHR || isRedirectedByExt) {
-    console.log(request);
     var url = request.request.url;
     var contentTypeHeader = _.find(request.response.headers, { 'name': 'Content-Type' });
     var contentType = '';
@@ -341,11 +415,13 @@ chrome.devtools.network.onRequestFinished.addListener(function(request){
     }
     request.response.contentType = contentType;
     var originalReqIndex = _.findIndex(requests, function(req) {
-      return req.response.redirectURL === url;
+      return req.request.response.redirectURL === url;
     });
     if (originalReqIndex === -1) {
-      request.key = request.time; // React Array key
-      requests.push(request);
+      requests = requests.concat([{
+        request: request,
+        key: request.time // React Array key
+      }]);
     }
     else {
       var amoeba = {}, isAmoebaRequest = false;
@@ -367,22 +443,35 @@ chrome.devtools.network.onRequestFinished.addListener(function(request){
             break;
         }
       });
+
+      var query = {};
+      var originalRequest = requests[originalReqIndex].request;
       if (isAmoebaRequest) {
         _.extend(request, {
           amoeba: amoeba,
-          key: requests[originalReqIndex].key,
-          request: requests[originalReqIndex].request
+          request: originalRequest.request
         });
-        requests[originalReqIndex] = request;
       }
       else {
         _.extend(request, {
-          amoeba: requests[originalReqIndex].amoeba,
-          key: requests[originalReqIndex].key,
-          request: requests[originalReqIndex].request
+          amoeba: originalRequest.amoeba,
+          request: originalRequest.request
         });
-        requests[originalReqIndex] = request;
       }
+      query[originalReqIndex] = {
+        $merge: {
+          request: request,
+          key: requests[originalReqIndex].key
+        },
+        // 原 request 被修改，增加标志位通知 React 重新渲染
+        // 否则会需要深度比较，有性能问题
+        _version: {
+          $apply: function(_version) {
+            return (_version || 0) + 1;
+          }
+        }
+      };
+      requests = React.addons.update(requests, query);
     }
     reqTable.setState({
       requests: requests
@@ -392,8 +481,7 @@ chrome.devtools.network.onRequestFinished.addListener(function(request){
 
 chrome.devtools.network.onNavigated.addListener(function(){
   console.log('page reloaded');
-  requests = [];
   reqTable.setState({
-    requests: requests
-  });
+    requests: []
+  }, reqTable.clearDetails);
 });
