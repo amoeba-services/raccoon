@@ -6,26 +6,34 @@
 //
 
 var panelConnections = {};
+var requestsCookies = {};
 
 function beforeRequestHandler(details) {
   var originalUrl = details.url;
-  if (originalUrl.indexOf('_ATS=') !== -1) {
-    // 如果出现 _ATS= 则不再跳转
+  if (/_AMB(CC|D|R)=/.test(originalUrl)) {
+    // 如果出现 _AMBD= _AMBR= _AMBCC= 则不再跳转
+    // Amoeba Data/Redirect/CookieCache
     return;
   }
+
   var namespace = panelConnections[details.tabId].namespace;
   if (!namespace) {
     console.error('namspace is not set for tab ' + details.tabId);
     return;
   }
   var redirectUrl = 'http://amoeba-api.herokuapp.com/data/' + namespace + '/';
-  var amoebaTimeStamp = Math.random().toFixed(6);
   if (originalUrl.indexOf('?') === -1) {
     originalUrl += '?';
   }
-  originalUrl += '&_ATS=' + amoebaTimeStamp;
+  else {
+    originalUrl += '&';
+  }
+  chrome.tabs.executeScript(details.tabId, {
+    code: 'var xhr = new XMLHttpRequest();xhr.open(\'HEAD\', \''+originalUrl+'_AMBCC='+details.requestId+'\');xhr.withCredentials = true;xhr.send();'
+  });
+  originalUrl += '_AMBR=' + details.requestId;
   redirectUrl += encodeURIComponent(originalUrl);
-  redirectUrl += '?_ATS=' + amoebaTimeStamp;
+  redirectUrl += '?_AMBD=' + details.requestId;
   return {
     redirectUrl: redirectUrl
   };
@@ -35,6 +43,36 @@ function beforeRequestHandler(details) {
 // 故这里给所有请求加上标记
 function beforeSendHeadersHandler(details) {
   var headers = details.requestHeaders;
+  var originalRequestId;
+
+  // 如果出现 _AMBCC= 则将其 cookie 缓存下来，并丢弃该请求
+  var isAmoebaCookieCacheRequest = details.url.match(/_AMBCC=([^&]*)/);
+  if (isAmoebaCookieCacheRequest !== null) {
+    originalRequestId = isAmoebaCookieCacheRequest[1];
+    if (originalRequestId !== undefined && originalRequestId !== '') {
+      for (var i = headers.length - 1; i >= 0; i--) {
+        if (headers[i].name === 'Cookie') {
+          requestsCookies[originalRequestId] = headers[i].value;
+          break;
+        }
+      }
+    }
+    console.log(requestsCookies);
+    return {
+      cancel: true
+    };
+  }
+
+  // 为二次跳转请求增加 Cookie
+  var isAmoebaRedirectRequest = details.url.match(/_AMBR=([^&]*)/);
+  if (isAmoebaRedirectRequest !== null) {
+    originalRequestId = isAmoebaRedirectRequest[1];
+    headers.push({
+      name: 'Cookie',
+      value: requestsCookies[originalRequestId]
+    });
+  }
+
   headers.push({
     name: 'X-Amoeba',
     value: '1'
@@ -76,6 +114,14 @@ function headersReceivedHandler(details) {
   };
 }
 
+function onCompletedHandler(details) {
+  var isAmoebaRequest = details.url.match(/_AMB(?:R|D)=([^&]*)/);
+  if (isAmoebaRequest !== null) {
+    var originalRequestId = isAmoebaRequest[1];
+    delete requestsCookies[originalRequestId];
+  }
+}
+
 function generateEventsHandlers() {
   return {
     beforeRequestHandler: function(details) {
@@ -89,6 +135,9 @@ function generateEventsHandlers() {
     },
     headersReceivedHandler: function(details) {
       return headersReceivedHandler(details);
+    },
+    onCompletedHandler: function(details) {
+      return onCompletedHandler(details);
     }
   };
 }
@@ -145,11 +194,12 @@ chrome.runtime.onConnect.addListener(function (port) {
           'tabId': message.tabId,
           'types': ['xmlhttprequest']
         }, ['blocking', 'requestHeaders']);
-        chrome.webRequest.onBeforeSendHeaders.addListener(connection.handlers.beforeSendHeadersHandler, {
-          'urls': ['*://*/*_ATS=*'],
+        // 请求结束清理 Cookie 缓存
+        chrome.webRequest.onCompleted.addListener(connection.handlers.onCompletedHandler, {
+          'urls': ['<all_urls>'],
           'tabId': message.tabId,
-          'types': ['other']
-        }, ['blocking', 'requestHeaders']);
+          'types': ['xmlhttprequest']
+        });
 
         return;
       }
@@ -205,6 +255,7 @@ chrome.runtime.onConnect.addListener(function (port) {
           chrome.webRequest.onBeforeSendHeaders.removeListener(connection.handlers.beforeSendHeadersHandler);
           chrome.webRequest.onBeforeSendHeaders.removeListener(connection.handlers.amoebaReqBeforeSendHeadersHandler);
           chrome.webRequest.onHeadersReceived.removeListener(connection.handlers.headersReceivedHandler);
+          chrome.webRequest.onBeforeSendHeaders.removeListener(connection.handlers.onCompletedHandler);
           delete panelConnections[tabs[i]];
           break;
         }
