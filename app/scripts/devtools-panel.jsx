@@ -58,7 +58,7 @@ var CM = React.createClass({
   componentDidMount: function() {
     this._cm = CodeMirror(this.getDOMNode(), {
       tabSize: 2,
-      readOnly: true,
+      readOnly: 'nocursor',
       lineNumbers: true,
       foldGutter: true,
       gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"]
@@ -141,7 +141,7 @@ var RequestDetails = React.createClass({
             {reqParams}
             {reqHeaders}
             <h2>Response</h2>
-            <p className="info"><span className="name">State: </span>{req.response.status} {req.response.statusText}</p>
+            <p className="info"><span className="name">Status: </span>{req.response.status} {req.response.statusText}</p>
             {resHeaders}
             <p className="info"><span className="name">Body: </span><span className="octicon octicon-arrow-right"></span></p>
           </div>
