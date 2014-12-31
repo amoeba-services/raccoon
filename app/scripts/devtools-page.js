@@ -10,7 +10,7 @@
 //});
 
 chrome.devtools.panels.create(
-  'Raccoon',
+  'Amoeba',
   null,
   'devtools-panel.html',
   null
