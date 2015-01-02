@@ -81,8 +81,8 @@ module.exports = function (grunt) {
       ]
     },
 
-    // Copies remaining files to places other tasks can use
     copy: {
+      // Copies remaining files to places other tasks can use
       dist: {
         files: [{
           expand: true,
@@ -94,6 +94,19 @@ module.exports = function (grunt) {
             '!bower_components/**',
             '!**/*.jsx',
             '!**/*.less'
+          ]
+        }]
+      },
+      // Copies all files to temp for browserify requirs.
+      temp: {
+        files: [{
+          expand: true,
+          dot: true,
+          cwd: '<%= config.app %>',
+          dest: '<%= config.temp %>',
+          src: [
+            '**',
+            '!bower_components/**'
           ]
         }]
       },
@@ -141,6 +154,10 @@ module.exports = function (grunt) {
       'devtools-panel': {
         src: '<%= config.temp %>/scripts/devtools-panel.js',
         dest: '<%= config.dist %>/scripts/devtools-panel.js'
+      },
+      'background': {
+        src: '<%= config.app %>/scripts/background.js',
+        dest: '<%= config.dist %>/scripts/background.js'
       }
     },
 
@@ -217,8 +234,10 @@ module.exports = function (grunt) {
     'clean:dist',
     'copy:dist',
     'clean:temp',
+    'copy:temp',
     'react',
-    'browserify',
+    'browserify:devtools-panel',
+    'browserify:background',
     'less'
   ]);
 

@@ -4,6 +4,7 @@
 //  console.log('previousVersion', details.previousVersion);
 //});
 //
+var CONFIG = require('./config');
 
 var panelConnections = {};
 var requestsCookies = {};
@@ -21,7 +22,7 @@ function beforeRequestHandler(details) {
     console.error('namspace is not set for tab ' + details.tabId);
     return;
   }
-  var redirectUrl = 'http://amoeba-api.herokuapp.com/data/' + namespace + '/';
+  var redirectUrl = CONFIG.api + '/data/' + namespace + '/';
   if (originalUrl.indexOf('?') === -1) {
     originalUrl += '?';
   }
@@ -221,7 +222,7 @@ chrome.runtime.onConnect.addListener(function (port) {
 
           // 添加 header，让 data api 出错时直接跳转到原地址
           chrome.webRequest.onBeforeSendHeaders.addListener(connection.handlers.amoebaReqBeforeSendHeadersHandler, {
-            'urls': ['*://amoeba-api.herokuapp.com/data/*'],
+            'urls': [CONFIG.api + '/data/*'],
             'tabId': message.tabId,
             'types': ['xmlhttprequest', 'other']
           }, ['blocking', 'requestHeaders']);

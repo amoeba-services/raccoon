@@ -1,8 +1,10 @@
 'use strict';
 
-var _ = require('lodash'),
+var CONFIG = require('./config'),
+  _ = require('lodash'),
   jsonFormat = require('json-format'),
-  React = require('react/addons');
+  React = require('react/addons'),
+  Utils = require('./utils');
 
 CodeMirror.modeURL = 'vendor/codemirror/codemirror/mode/%N/%N.js'; // 好恶心
 
@@ -193,7 +195,10 @@ var RequestInfo = React.createClass({
       uri = Utils.parseUri(info.request.url);
     info.amoeba = info.amoeba || {};
     var statusText = info.response.status + ' ' + info.response.statusText,
-      amoebaStatusText = ' ' + (info.amoeba.status ? (info.amoeba.status + ' ' + info.amoeba.message) : '-');
+      amoebaStatusText = ' ' + (info.amoeba.status ? (info.amoeba.status + ' ' + info.amoeba.message) : '-'),
+      path = info.amoeba.matchedApi || uri.path,
+      namespace = statusBar && statusBar.state.selectedNamespace,
+      amoebaManagementPortal = CONFIG.portal + '/#/apis/' + namespace + '/' + encodeURIComponent(encodeURIComponent(path));
     return (
       <tr className="request-info-item" data-active={this.props.request.active}>
         <td className="method" title={info.request.method}>{info.request.method}</td>
@@ -204,9 +209,12 @@ var RequestInfo = React.createClass({
         <td className="content-type" title={info.response.contentType}>
           {info.response.contentType}
         </td>
-        <td className="amoeba">
+        <td className="amoeba" title={amoebaStatusText}>
           <AmoebaStatusIcon status={info.amoeba.status}/>
           {amoebaStatusText}
+          <a className="amoeba-portal" href={amoebaManagementPortal} title="Edit" target="_blank">
+            <span className="icon-btn octicon octicon-pencil"></span>
+          </a>
         </td>
       </tr>
     );
@@ -393,10 +401,11 @@ var NAMESPACES = [
   'pc',
   'mis'
 ];
-React.render(
+var statusBar = React.render(
   <StatusBar namespaces={NAMESPACES}/>,
   document.getElementById('status-bar')
-).changeNamespace(localStorage.getItem('selectedNamespace') || NAMESPACES[0]);
+);
+statusBar.changeNamespace(localStorage.getItem('selectedNamespace') || NAMESPACES[0]);
 
 chrome.devtools.network.onRequestFinished.addListener(function(request){
   var requests = reqTable.state.requests;
