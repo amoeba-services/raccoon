@@ -60,7 +60,7 @@ var CM = React.createClass({
   componentDidMount: function() {
     this._cm = CodeMirror(this.getDOMNode(), {
       tabSize: 2,
-      readOnly: 'nocursor',
+      readOnly: true,
       lineNumbers: true,
       foldGutter: true,
       gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"]
