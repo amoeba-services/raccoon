@@ -1,4 +1,4 @@
 {
   "api": "https://amoeba-api.herokuapp.com",
-  "portal": "https://amoebaio.herokuapp.com"
+  "console": "https://amoeba.services"
 }

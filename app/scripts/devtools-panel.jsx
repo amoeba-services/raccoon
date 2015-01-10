@@ -198,7 +198,7 @@ var RequestInfo = React.createClass({
       amoebaStatusText = ' ' + (info.amoeba.status ? (info.amoeba.status + ' ' + info.amoeba.message) : '-'),
       path = info.amoeba.matchedApi || uri.path,
       namespace = statusBar && statusBar.state.selectedNamespace,
-      amoebaManagementPortal = CONFIG.portal + '/#/apis/' + namespace + '/' + encodeURIComponent(encodeURIComponent(path));
+      amoebaConsole = CONFIG.console + '/#/apis/' + namespace + '/' + encodeURIComponent(encodeURIComponent(path));
     return (
       <tr className="request-info-item" data-active={this.props.request.active}>
         <td className="method" title={info.request.method}>{info.request.method}</td>
@@ -212,7 +212,7 @@ var RequestInfo = React.createClass({
         <td className="amoeba" title={amoebaStatusText}>
           <AmoebaStatusIcon status={info.amoeba.status}/>
           {amoebaStatusText}
-          <a className="amoeba-portal" href={amoebaManagementPortal} title="Edit" target="_blank">
+          <a className="amoeba-console" href={amoebaConsole} title="Edit" target="_blank">
             <span className="icon-btn octicon octicon-pencil"></span>
           </a>
         </td>
